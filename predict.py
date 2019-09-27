@@ -8,8 +8,14 @@ import tqdm
 import time
 from unet import Unet
 import glob
-model_path = 'model.h5'
-num_class = 3
+
+back = [0,0,0]
+stalk = [255,0,0]
+twig = [0,255,0]
+grain = [128,128,0]
+COLOR_DICT = np.array([back,stalk, twig, grain])#上色代码只有4类
+
+
 from keras.preprocessing.image import img_to_array
 
 def predict_x(batch_x, model):
@@ -132,14 +138,19 @@ def main(model,allpath,sign='tif',changes=False):#读取图片函数
         d, n = os.path.split(one_path)
         t0 = time.time()
         change = y_preds.astype(np.uint8)
+        img_out = np.zeros(change.shape + (3,))
+        for i in range(num_class):
+            img_out[change == i, :] = COLOR_DICT[i]#对应上色
+        change = img_out / 255
         outpath = os.path.join(d,'result')
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         save_file=os.path.join(outpath,'gyey'+n)
         skimage.io.imsave(save_file, change)
-        CreatTf(one_path,outpath)#添加坐标系
+        #CreatTf(one_path,outpath)#添加坐标系
         print('预测耗费时间: %0.2f(min).' % ((time.time() - t0) / 60))
 
+num_class = 3#预测种类
 model = Unet((256,256,3),num_class)
 p = 'model.h5'  # 说明权重所在位置
 print("网络参数来自: '%s'." % p)
