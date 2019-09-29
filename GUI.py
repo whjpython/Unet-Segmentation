@@ -50,7 +50,7 @@ C.grid(row=2, column=1)
 def show():
     modelpath = A.get()
     pic =B.get()
-    allpic = glob.glob(os.path.join(pic,'*.tif'))
+    allpic = glob.glob(os.path.join(pic,'*.png'))
     lastpic = allpic[-1]
     d,n = os.path.split(lastpic)
     lastpic_save = os.path.join(d,'result'+'/'+n)
@@ -64,12 +64,16 @@ def show():
     if pic and modelpath:
         print(pic)
         change.set('执行中...')
-        model = Unet((256, 256, 3), 2)
+        model = Unet((256, 256, 3), 3)
         model.load_weights(modelpath)
-        model.predict(np.zeros((2, 256, 256, 3)))#提前预测
-        th = threading.Thread(target=main_p,args=(model,pic))
-        th.setDaemon(True)
-        th.start()
+        '''
+        多线程有点问题
+        #model.predict(np.zeros((2, 256, 256, 3)))#提前预测
+        #th = threading.Thread(target=main_p,args=(model,pic))
+        #th.setDaemon(True)
+        #th.start()
+        '''
+        main_p(model, pic)
         def xx():
             a = '->'
             while True:
