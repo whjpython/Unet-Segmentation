@@ -3,7 +3,6 @@ import numpy as np
 import os
 from osgeo.gdalconst import *
 from osgeo import gdal
-from keras.models import load_model
 import tqdm
 import time
 from unet import Unet
@@ -15,8 +14,7 @@ twig = [0,255,0]
 grain = [128,128,0]
 COLOR_DICT = np.array([back,stalk, twig, grain])#上色代码只有4类
 
-
-from keras.preprocessing.image import img_to_array
+num_class = 3#网络识别类别
 
 def predict_x(batch_x, model):
     """
@@ -38,11 +36,11 @@ def stretch(img):#%2線性拉伸
         img[:, :, i] = t
     return img
 
-def CreatTf(file_path_img,outpath):#原始文件，识别后的文件数组形式，新保存文件
+def CreatTf(file_path_img,data,outpath):#原始文件，识别后的文件数组形式，新保存文件
     d,n = os.path.split(file_path_img)
     dataset = gdal.Open(file_path_img, GA_ReadOnly)#打开图片只读
-    data = gdal.Open(os.path.join(outpath,'gyey'+n))#打开标签图片
-    data_label = data.ReadAsArray(0, 0, data.RasterXSize, data.RasterYSize)#获取数据
+    #data = gdal.Open(os.path.join(outpath,'gyey'+n))#打开标签图片
+    #data_label = data.ReadAsArray(0, 0, data.RasterXSize, data.RasterYSize)#获取数据
     projinfo = dataset.GetProjection()#获取坐标系
     geotransform = dataset.GetGeoTransform()
     #band = dataset.RasterCount()
@@ -53,7 +51,7 @@ def CreatTf(file_path_img,outpath):#原始文件，识别后的文件数组形�
                               1, gdal.GDT_Byte )#创建一个新的文件
     dst_ds.SetGeoTransform(geotransform)#投影
     dst_ds.SetProjection(projinfo)#坐标
-    dst_ds.GetRasterBand(1).WriteArray(data_label)
+    dst_ds.GetRasterBand(1).WriteArray(data)
     dst_ds.FlushCache()
 
 
@@ -122,7 +120,7 @@ def make_prediction_img(x, target_size, batch_size, predict):  # 函数当做变
         :]  # 收缩切割为原来的尺寸
     return y  # 原图像的预测结果
 
-def main(model,allpath,sign='tif',changes=False):#读取图片函数
+def main_p(model,allpath,sign='tif',changes=True):#读取图片函数
     print('执行预测...')
     img_p = glob.glob(os.path.join(allpath, "*.%s"%sign))
     for one_path in img_p:
@@ -138,22 +136,21 @@ def main(model,allpath,sign='tif',changes=False):#读取图片函数
         d, n = os.path.split(one_path)
         t0 = time.time()
         change = y_preds.astype(np.uint8)
+        outpath = os.path.join(d, 'result')
+        if not os.path.exists(outpath):
+            os.makedirs(outpath)
+        CreatTf(one_path, change,outpath)  # 添加坐标系
         img_out = np.zeros(change.shape + (3,))
         for i in range(num_class):
             img_out[change == i, :] = COLOR_DICT[i]#对应上色
         change = img_out / 255
-        outpath = os.path.join(d,'result')
-        if not os.path.exists(outpath):
-            os.makedirs(outpath)
-        save_file=os.path.join(outpath,'gyey'+n)
+        save_file=os.path.join(outpath,n[:-4]+'_color'+'.png')
         skimage.io.imsave(save_file, change)
-        #CreatTf(one_path,outpath)#添加坐标系
         print('预测耗费时间: %0.2f(min).' % ((time.time() - t0) / 60))
-
-num_class = 3#预测种类
-model = Unet((256,256,3),num_class)
-p = 'model.h5'  # 说明权重所在位置
-print("网络参数来自: '%s'." % p)
-model.load_weights(p)
-path = r'F:\cmm\yumi\pic\image'
-main(model,path,changes=False)
+if __name__ == '__main__':
+    model = Unet((256,256,3),num_class)
+    p = r'E:\buildingone\output\YMDD.h5'  # 说明权重所在位置
+    print("网络参数来自: '%s'." % p)
+    model.load_weights(p)
+    path = r'E:\mynet\end'
+    main_p(model,path,changes=False)
